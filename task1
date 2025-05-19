@@ -1,6 +1,3 @@
-# Canvas Project 1: 景気循環とHPフィルターの役割
-# サンプルデータを用いてHPフィルターを適用し、トレンドと循環成分を可視化
-
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
