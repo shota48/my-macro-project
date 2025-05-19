@@ -19,32 +19,35 @@ for lam in lambdas:
     cycle_components[lam] = cycle
 import matplotlib.pyplot as plt
 
+# グラフ1：元のデータとトレンド成分の比較
 plt.figure(figsize=(12, 6))
 plt.plot(gdp.index, gdp['log_GDP'], label='対数GDP', linewidth=2)
-
 for lam in lambdas:
     plt.plot(gdp.index, trend_components[lam], label=f"トレンド (λ={lam})")
-
 plt.title("対数GDPとトレンド成分の比較")
 plt.xlabel("年")
 plt.ylabel("対数GDP")
 plt.legend()
 plt.grid(True)
 plt.tight_layout()
+plt.savefig("trend_plot.png")  # ←追加
 plt.show()
 
+# グラフ2：循環成分の比較
 plt.figure(figsize=(12, 6))
-
 for lam in lambdas:
     plt.plot(gdp.index, cycle_components[lam], label=f"循環成分 (λ={lam})")
-
 plt.title("循環成分の比較")
 plt.xlabel("年")
 plt.ylabel("対数GDPの循環成分")
 plt.legend()
 plt.grid(True)
 plt.tight_layout()
+plt.savefig("cycle_plot.png")  # ←追加
 plt.show()
+
+plt.savefig("trend_plot.png")   # トレンド比較グラフ
+plt.savefig("cycle_plot.png")   # 循環成分グラフ
 
 
 
