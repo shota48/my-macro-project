@@ -1,21 +1,14 @@
 import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-from statsmodels.tsa.filters.hp_filter import hpfilter
-import datetime
-
-# 1. サンプルGDPデータの作成（FREDの代替）
-dates = pd.date_range(start='2000-01-01', periods=100, freq='Q')
-# 仮のGDPデータ（成長と周期性を持つ）
-gdp_values = 1000 * np.exp(0.02 * np.arange(100)) * (1 + 0.02 * np.sin(np.linspace(0, 20, 100)))
-
-gdp = pd.DataFrame({'DATE': dates, 'GDPC1': gdp_values})
+gdp = pd.read_csv("GDPC1.csv", skiprows=range(1, 10))  # ヘッダー行の位置によっては調整が必要
+gdp['DATE'] = pd.to_datetime(gdp['DATE'])
 gdp.set_index('DATE', inplace=True)
 
-# 2. 対数変換
+import numpy as np
 gdp['log_GDP'] = np.log(gdp['GDPC1'])
+from statsmodels.tsa.filters.hp_filter import hpfilter
 
-# 3. HPフィルターの適用とλの検討
+# 例：λ=1600 を用いた場合
+cycle, trend = hpfilter(gdp['log_GDP'], lamb=1600)
 lambdas = [10, 100, 1600]
 trend_components = {}
 cycle_components = {}
@@ -24,13 +17,14 @@ for lam in lambdas:
     cycle, trend = hpfilter(gdp['log_GDP'], lamb=lam)
     trend_components[lam] = trend
     cycle_components[lam] = cycle
+import matplotlib.pyplot as plt
 
-# 4. 可視化
-# グラフ1：元のデータとトレンド成分の比較
 plt.figure(figsize=(12, 6))
 plt.plot(gdp.index, gdp['log_GDP'], label='対数GDP', linewidth=2)
+
 for lam in lambdas:
     plt.plot(gdp.index, trend_components[lam], label=f"トレンド (λ={lam})")
+
 plt.title("対数GDPとトレンド成分の比較")
 plt.xlabel("年")
 plt.ylabel("対数GDP")
@@ -39,10 +33,11 @@ plt.grid(True)
 plt.tight_layout()
 plt.show()
 
-# グラフ2：循環成分の比較
 plt.figure(figsize=(12, 6))
+
 for lam in lambdas:
     plt.plot(gdp.index, cycle_components[lam], label=f"循環成分 (λ={lam})")
+
 plt.title("循環成分の比較")
 plt.xlabel("年")
 plt.ylabel("対数GDPの循環成分")
@@ -50,4 +45,7 @@ plt.legend()
 plt.grid(True)
 plt.tight_layout()
 plt.show()
+
+
+
 
