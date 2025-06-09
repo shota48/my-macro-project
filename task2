@@ -1,1 +1,136 @@
+import pandas as pd
+import numpy as np
 
+# 1. データ取得と設定
+# Penn World Table 10.01のExcelファイル名。
+# このスクリプトと同じディレクトリに配置してください。
+# ダウンロード元: https://www.rug.nl/ggdc/productivity/pwt/
+# 「PWT 10.01 (xlsx)」を探してください。
+file_path = 'pwt1001.xlsx' 
+
+# 分析期間の定義
+start_year = 1990
+end_year = 2019
+
+# Aghion & Howitt (2009) の表5.1 (Image 1) に記載されているOECD諸国と、
+# それに対応するPWTの国コードのリスト。
+oecd_countries = {
+    'Australia': 'AUS',
+    'Austria': 'AUT',
+    'Belgium': 'BEL',
+    'Canada': 'CAN',
+    'Denmark': 'DNK',
+    'Finland': 'FIN',
+    'France': 'FRA',
+    'Germany': 'DEU', 
+    'Greece': 'GRC',
+    'Iceland': 'ISL',
+    'Ireland': 'IRL',
+    'Italy': 'ITA',
+    'Japan': 'JPN',
+    'Netherlands': 'NLD',
+    'New Zealand': 'NZL',
+    'Norway': 'NOR',
+    'Portugal': 'PRT',
+    'Spain': 'ESP',
+    'Sweden': 'SWE',
+    'Switzerland': 'CHE', 
+    'United Kingdom': 'GBR', 
+    'United States': 'USA'
+}
+
+# 2. データ読み込みと前処理
+try:
+    # Excelファイルからデータを読み込む。PWT 10.01のデータは通常、
+    # 'Data'シートの3行目または4行目から始まる。
+    df = pd.read_excel(file_path, sheet_name='Data', skiprows=3) 
+except FileNotFoundError:
+    print(f"エラー: ファイル '{file_path}' が見つかりません。")
+    print("「pwt1001.xlsx」がスクリプトと同じディレクトリにあることを確認してください。")
+    exit()
+
+# 列名を小文字に変換してアクセスしやすくする
+df.columns = df.columns.str.lower()
+
+# 指定された期間 (1990-2019) でデータをフィルタリング [3]
+df_filtered = df[(df['year'] >= start_year) & (df['year'] <= end_year)].copy()
+
+# OECD諸国でフィルタリング
+oecd_country_codes = list(oecd_countries.values())
+df_oecd = df_filtered[df_filtered['countrycode'].isin(oecd_country_codes)].copy()
+
+# PWTの国コードを完全な国名にマッピングして出力テーブルに使用
+country_code_to_name = {v: k for k, v in oecd_countries.items()}
+df_oecd['country_name_full'] = df_oecd['countrycode'].map(country_code_to_name)
+
+# 必要な列を選択し、これらの列に欠損値がある行を削除
+# これにより、すべての変数で一貫した計算が保証される
+required_cols = ['country_name_full', 'year', 'rgdpna', 'emp', 'ck', 'labsh']
+df_oecd_clean = df_oecd[required_cols].dropna(subset=['rgdpna', 'emp', 'ck', 'labsh'])
+
+# 対数差分計算のためにデータをソート
+df_oecd_clean = df_oecd_clean.sort_values(by=['country_name_full', 'year'])
+
+# 3. 成長率計算と成長会計分解
+
+results =
+
+for country_name, country_code in oecd_countries.items():
+    country_data = df_oecd_clean[df_oecd_clean['country_name_full'] == country_name].copy()
+
+    if country_data.empty or len(country_data) < 2:
+        # 成長率計算に十分なデータがない国はスキップ
+        print(f"警告: {country_name} のデータが不十分です。スキップします。")
+        continue
+
+    # 1人あたりGDP (y) と1人あたり資本 (k) を計算
+    country_data['y'] = country_data['rgdpna'] / country_data['emp']
+    country_data['k'] = country_data['ck'] / country_data['emp']
+
+    # 対数差分を用いて年間成長率を計算 [Image 2, Point 3]
+    country_data['g_y'] = np.log(country_data['y']) - np.log(country_data['y'].shift(1))
+    country_data['g_k'] = np.log(country_data['k']) - np.log(country_data['k'].shift(1))
+
+    # 期間全体の平均労働分配率 (1-alpha) と資本分配率 (alpha) を計算 [Image 2, Point 4]
+    avg_labsh = country_data['labsh'].mean()
+    alpha = 1 - avg_labsh # 資本分配率
+
+    # 期間全体の平均成長率を計算 (最初の年のNaNは除外)
+    avg_g_y = country_data['g_y'].mean()
+    avg_g_k = country_data['g_k'].mean()
+
+    # 成長会計の構成要素
+    growth_rate = avg_g_y * 100 # パーセンテージに変換
+    capital_deepening = (alpha * avg_g_k) * 100 # パーセンテージに変換
+    tfp_growth = (avg_g_y - (alpha * avg_g_k)) * 100 # ソロー残差として計算 [3]
+
+    # TFPシェアは労働分配率 (1-alpha) として解釈される [Image 2, Point 4]
+    tfp_share = avg_labsh * 100 # パーセンテージに変換
+    capital_share = alpha * 100 # パーセンテージに変換
+
+    results.append({
+        'Country': country_name,
+        'Growth Rate': growth_rate,
+        'TFP Growth': tfp_growth,
+        'Capital Deepening': capital_deepening,
+        'TFP Share': tfp_share,
+        'Capital Share': capital_share
+    })
+
+# 結果からDataFrameを作成
+results_df = pd.DataFrame(results)
+
+# 平均行を計算
+average_row = results_df.mean(numeric_only=True)
+average_row['Country'] = 'Average'
+results_df.loc['Average'] = average_row
+
+# 4. テーブル生成とフォーマット
+# 例のテーブルに合わせて小数点以下2桁にフォーマット
+formatted_df = results_df.round(2)
+
+# Markdown形式でテーブルを出力
+print("| Country | Growth Rate | TFP Growth | Capital Deepening | TFP Share | Capital Share |")
+print("|---|---|---|---|---|---|")
+for index, row in formatted_df.iterrows():
+    print(f"| {row['Country']} | {row:.2f} | {row:.2f} | {row:.2f} | {row:.2f} | {row:.2f} |")
